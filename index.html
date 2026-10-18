@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plataforma de Robótica Educativa</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0e1118;
+            color: #ffffff;
+            text-align: center;
+            padding: 30px 10px;
+            margin: 0;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: #161b22;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            border: 1px solid #30363d;
+        }
+        h1 { color: #58a6ff; font-size: 24px; margin-bottom: 5px; }
+        p { color: #8b949e; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+        
+        .btn-conectar {
+            background-color: #238636;
+            color: white;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: 0.2s;
+            width: 100%;
+        }
+        .btn-conectar:hover { background-color: #2ea043; }
+        
+        #estado {
+            background: #21262d;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            color: #8b949e;
+            border: 1px solid #30363d;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+
+        .control-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 15px;
+            justify-content: center;
+            margin: 0 auto 25px auto;
+            max-width: 320px;
+        }
+        
+        .btn-direccion {
+            background-color: #21262d;
+            color: #c9d1d9;
+            padding: 20px 10px;
+            font-size: 16px;
+            font-weight: bold;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            cursor: pointer;
+            user-select: none;
+            transition: 0.1s;
+            touch-action: manipulation; 
+        }
+        .btn-direccion:hover { background-color: #30363d; color: white; }
+        .btn-direccion:active, .btn-direccion.activo { 
+            background-color: #58a6ff; 
+            color: black; 
+            transform: scale(0.95);
+        }
+        
+        .btn-panico {
+            background-color: #da3633;
+            color: white;
+            border: 1px solid #f85149;
+        }
+        .btn-panico:active, .btn-panico.activo {
+            background-color: #f85149;
+            color: white;
+        }
+
+        .vacio { visibility: hidden; }
+        
+        .ayuda-teclado {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 15px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Ecosistema STEM - Robot Control</h1>
+        <p>Fase 1: Control por Web Serial API</p>
+        
+        <button class="btn-conectar" id="botonConectar" onclick="conectarArduino()">🔌 CONECTAR ARDUINO</button>
+        <div id="estado">Estado: Esperando conexión...</div>
+
+        <div class="control-pad">
+            <div class="vacio"></div>
+            <button class="btn-direccion" id="btnF" onclick="enviarComando('F', 'Frente')">▲<br>Frente</button>
+            <div class="vacio"></div>
+
+            <button class="btn-direccion" id="btnL" onclick="enviarComando('L', 'Izquierda')">◀<br>Izq</button>
+            <button class="btn-direccion btn-panico" id="btnS" onclick="enviarComando('S', 'ALTO')">✖<br>STOP</button>
+            <button class="btn-direccion" id="btnR" onclick="enviarComando('R', 'Derecha')">▶<br>Der</button>
+
+            <div class="vacio"></div>
+            <button class="btn-direccion" id="btnB" onclick="enviarComando('B', 'Atrás')">▼<br>Atrás</button>
+            <div class="vacio"></div>
+        </div>
+        
+        <div class="ayuda-teclado">💡 Tip: También puedes usar las flechas del teclado y la barra espaciadora (STOP).</div>
+    </div>
+
+    <script>
+        let port;
+        let writer;
+        let conectado = false;
+
+        async function conectarArduino() {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                writer = port.writable.getWriter();
+                conectado = true;
+                
+                const estadoDiv = document.getElementById('estado');
+                estadoDiv.innerText = "🟢 CONECTADO Y LISTO";
+                estadoDiv.style.color = "#238636";
+                estadoDiv.style.borderColor = "#238636";
+                document.getElementById('botonConectar').style.display = "none";
+                
+                port.addEventListener('disconnect', () => {
+                    conectado = false;
+                    document.getElementById('estado').innerText = "🔴 ARDUINO DESCONECTADO";
+                    document.getElementById('estado').style.color = "#f85149";
+                    document.getElementById('botonConectar').style.display = "block";
+                });
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('estado').innerText = "❌ Error al conectar";
+                document.getElementById('estado').style.color = "#f85149";
+            }
+        }
+
+        async function enviarComando(letra, nombreComando) {
+            if (!conectado || !writer) {
+                document.getElementById('estado').innerText = "⚠️ Conecta el Arduino primero";
+                document.getElementById('estado').style.color = "#d29922";
+                return;
+            }
+
+            try {
+                const encoder = new TextEncoder();
+                await writer.write(encoder.encode(letra));
+                
+                const estadoDiv = document.getElementById('estado');
+                estadoDiv.innerText = `⚡ Enviando: ${nombreComando}`;
+                estadoDiv.style.color = "#58a6ff";
+                estadoDiv.style.borderColor = "#30363d";
+
+                const btnId = `btn${letra}`;
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    btn.classList.add('activo');
+                    setTimeout(() => btn.classList.remove('activo'), 200);
+                }
+
+            } catch (error) {
+                console.error("Error al enviar:", error);
+                document.getElementById('estado').innerText = "❌ Error de comunicación";
+                document.getElementById('estado').style.color = "#f85149";
+            }
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.repeat) return; 
+
+            switch(event.key) {
+                case 'ArrowUp': enviarComando('F', 'Frente'); break;
+                case 'ArrowDown': enviarComando('B', 'Atrás'); break;
+                case 'ArrowLeft': enviarComando('L', 'Izquierda'); break;
+                case 'ArrowRight': enviarComando('R', 'Derecha'); break;
+                case ' ': 
+                case 'Escape': enviarComando('S', 'ALTO'); break;
+            }
+        });
+    </script>
+</body>
+</html>
